@@ -1,0 +1,14 @@
+# .NET build output
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.csproj.user
+
+# Test results
+TestResults/
+
+# Other
+.DS_Store
+*.log
