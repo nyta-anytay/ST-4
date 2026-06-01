@@ -1,303 +1,196 @@
-// BugTests/UnitTest1.cs
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using BugPro;
-using Stateless;
+using System;
 
 namespace BugTests
 {
     [TestClass]
-    public class BugWorkflowTests
+    public class BugStateMachineTests
     {
-        [TestMethod]
-        public void Test_InitialState_ShouldBeOpen()
+        private Bug _bug;
+
+        [TestInitialize]
+        public void Setup()
         {
-            
-            var bug = new Bug();
-            
-            Assert.AreEqual(BugState.Open, bug.CurrentState);
+            _bug = new Bug();
         }
 
         [TestMethod]
-        public void Test_Assign_ShouldTransitionToAssigned()
+        public void Test_01_InitialState_ShouldBeNew()
         {
-            
-            var bug = new Bug();
-            
-            bug.Assign("John");
-            
-            Assert.AreEqual(BugState.Assigned, bug.CurrentState);
+            Assert.AreEqual(State.New, _bug.CurrentState);
         }
 
         [TestMethod]
-        public void Test_Assign_ShouldStoreDeveloperName()
+        public void Test_02_New_To_Triage()
         {
-            
-            var bug = new Bug();
-            string developer = "Jane Developer";
-            
-            bug.Assign(developer);
-            
-            Assert.AreEqual(developer, bug.AssignedTo);
+            _bug.Fire(Trigger.StartTriage);
+            Assert.AreEqual(State.Triage, _bug.CurrentState);
         }
 
         [TestMethod]
-        public void Test_StartWork_FromAssigned_ShouldTransitionToInProgress()
+        public void Test_03_Triage_To_Fixing()
         {
-            
-            var bug = new Bug();
-            bug.Assign("John");
-            
-            bug.StartWork();
-            
-            Assert.AreEqual(BugState.InProgress, bug.CurrentState);
+            _bug.Fire(Trigger.StartTriage);
+            _bug.Fire(Trigger.AssignToDev);
+            Assert.AreEqual(State.Fixing, _bug.CurrentState);
         }
 
         [TestMethod]
-        public void Test_Fix_FromInProgress_ShouldTransitionToFixed()
+        public void Test_04_Triage_To_Deferred()
         {
-            
-            var bug = new Bug();
-            bug.Assign("John");
-            bug.StartWork();
-            
-            bug.Fix();
-            
-            Assert.AreEqual(BugState.Fixed, bug.CurrentState);
+            _bug.Fire(Trigger.StartTriage);
+            _bug.Fire(Trigger.Defer);
+            Assert.AreEqual(State.DeferredOrMoreInfo, _bug.CurrentState);
         }
 
         [TestMethod]
-        public void Test_Verify_FromFixed_ShouldTransitionToVerified()
+        public void Test_05_Triage_To_Rejected()
         {
-            
-            var bug = new Bug();
-            bug.Assign("John");
-            bug.StartWork();
-            bug.Fix();
-            
-            bug.Verify();
-            
-            Assert.AreEqual(BugState.Verified, bug.CurrentState);
+            _bug.Fire(Trigger.StartTriage);
+            _bug.Fire(Trigger.Reject);
+            Assert.AreEqual(State.Rejected, _bug.CurrentState);
         }
 
         [TestMethod]
-        public void Test_Close_FromVerified_ShouldTransitionToClosed()
+        public void Test_06_Deferred_BackTo_Triage()
         {
-            
-            var bug = new Bug();
-            bug.Assign("John");
-            bug.StartWork();
-            bug.Fix();
-            bug.Verify();
-            
-            bug.Close();
-            
-            Assert.AreEqual(BugState.Closed, bug.CurrentState);
+            _bug.Fire(Trigger.StartTriage);
+            _bug.Fire(Trigger.Defer);
+            _bug.Fire(Trigger.ReturnToTriage);
+            Assert.AreEqual(State.Triage, _bug.CurrentState);
         }
 
         [TestMethod]
-        public void Test_Reopen_FromClosed_ShouldTransitionToReopened()
+        public void Test_07_Fixing_To_Testing()
         {
-            
-            var bug = new Bug();
-            bug.Assign("John");
-            bug.StartWork();
-            bug.Fix();
-            bug.Verify();
-            bug.Close();
-            
-            bug.Reopen();
-            
-            Assert.AreEqual(BugState.Reopened, bug.CurrentState);
+            _bug.Fire(Trigger.StartTriage);
+            _bug.Fire(Trigger.AssignToDev);
+            _bug.Fire(Trigger.Resolve);
+            Assert.AreEqual(State.Testing, _bug.CurrentState);
         }
 
         [TestMethod]
-        public void Test_Reject_FromOpen_ShouldTransitionToRejected()
+        public void Test_08_Fixing_To_ReviewCannotReproduce()
         {
-            
-            var bug = new Bug();
-            
-            bug.Reject();
-            
-            Assert.AreEqual(BugState.Rejected, bug.CurrentState);
+            _bug.Fire(Trigger.StartTriage);
+            _bug.Fire(Trigger.AssignToDev);
+            _bug.Fire(Trigger.MarkCannotReproduce);
+            Assert.AreEqual(State.ReviewCannotReproduce, _bug.CurrentState);
         }
 
         [TestMethod]
-        public void Test_MarkDuplicate_FromOpen_ShouldTransitionToDuplicate()
+        public void Test_09_Testing_To_Closed_WhenVerifiedFixed()
         {
-            
-            var bug = new Bug();
-            
-            bug.MarkDuplicate();
-            
-            Assert.AreEqual(BugState.Duplicate, bug.CurrentState);
+            _bug.Fire(Trigger.StartTriage);
+            _bug.Fire(Trigger.AssignToDev);
+            _bug.Fire(Trigger.Resolve);
+            _bug.Fire(Trigger.VerifyFixed);
+            Assert.AreEqual(State.Closed, _bug.CurrentState);
         }
 
         [TestMethod]
-        public void Test_RequestInfo_FromOpen_ShouldTransitionToNeedMoreInfo()
+        public void Test_10_Testing_To_Triage_WhenVerifyFailed()
         {
-            
-            var bug = new Bug();
-            
-            bug.RequestInfo();
-            
-            Assert.AreEqual(BugState.NeedMoreInfo, bug.CurrentState);
+            _bug.Fire(Trigger.StartTriage);
+            _bug.Fire(Trigger.AssignToDev);
+            _bug.Fire(Trigger.Resolve);
+            _bug.Fire(Trigger.VerifyFailed);
+            Assert.AreEqual(State.Triage, _bug.CurrentState);
         }
 
         [TestMethod]
-        public void Test_ProvideInfo_FromNeedMoreInfo_ShouldTransitionToOpen()
+        public void Test_11_ReviewCannotReproduce_To_Closed()
         {
-            
-            var bug = new Bug();
-            bug.RequestInfo();
-            
-            bug.ProvideInfo();
-            
-            Assert.AreEqual(BugState.Open, bug.CurrentState);
+            _bug.Fire(Trigger.StartTriage);
+            _bug.Fire(Trigger.AssignToDev);
+            _bug.Fire(Trigger.MarkCannotReproduce);
+            _bug.Fire(Trigger.ConfirmCannotReproduce);
+            Assert.AreEqual(State.Closed, _bug.CurrentState);
         }
 
         [TestMethod]
-        [ExpectedException(typeof(InvalidOperationException))]
-        public void Test_StartWork_FromOpen_ShouldThrowException()
+        public void Test_12_ReviewCannotReproduce_To_Triage_WhenRejected()
         {
-            
-            var bug = new Bug();
-            
-            bug.StartWork();
+            _bug.Fire(Trigger.StartTriage);
+            _bug.Fire(Trigger.AssignToDev);
+            _bug.Fire(Trigger.MarkCannotReproduce);
+            _bug.Fire(Trigger.ReturnToTriage);
+            Assert.AreEqual(State.Triage, _bug.CurrentState);
         }
 
         [TestMethod]
-        [ExpectedException(typeof(InvalidOperationException))]
-        public void Test_Fix_FromAssigned_ShouldThrowException()
+        public void Test_13_Closed_To_Triage_Via_Reopen()
         {
-            
-            var bug = new Bug();
-            bug.Assign("John");
-            
-            bug.Fix();
+            _bug.Fire(Trigger.StartTriage);
+            _bug.Fire(Trigger.AssignToDev);
+            _bug.Fire(Trigger.Resolve);
+            _bug.Fire(Trigger.VerifyFixed); 
+            _bug.Fire(Trigger.Reopen);      
+            Assert.AreEqual(State.Triage, _bug.CurrentState);
         }
 
         [TestMethod]
-        [ExpectedException(typeof(InvalidOperationException))]
-        public void Test_Verify_FromInProgress_ShouldThrowException()
+        public void Test_14_Rejected_To_Triage_Via_Reopen()
         {
-            
-            var bug = new Bug();
-            bug.Assign("John");
-            bug.StartWork();
-            
-            bug.Verify();
+            _bug.Fire(Trigger.StartTriage);
+            _bug.Fire(Trigger.Reject);
+            _bug.Fire(Trigger.Reopen);
+            Assert.AreEqual(State.Triage, _bug.CurrentState);
         }
 
         [TestMethod]
-        public void Test_Reopen_FromReopened_ShouldStayReopened()
+        public void Test_15_Exception_When_Assigning_New_Bug()
         {
-            
-            var bug = new Bug();
-            bug.Assign("John");
-            bug.StartWork();
-            bug.Fix();
-            bug.Verify();
-            bug.Close();
-            bug.Reopen();
-            
+            Assert.ThrowsException<InvalidOperationException>(() => _bug.Fire(Trigger.AssignToDev));
         }
 
         [TestMethod]
-        public void Test_CompleteWorkflow_ShouldEndInClosed()
+        public void Test_16_Exception_When_Resolving_From_Triage()
         {
-            
-            var bug = new Bug();
-            
-            bug.Assign("John");
-            bug.StartWork();
-            bug.Fix();
-            bug.Verify();
-            bug.Close();
-            
-            Assert.AreEqual(BugState.Closed, bug.CurrentState);
+            _bug.Fire(Trigger.StartTriage);
+            Assert.ThrowsException<InvalidOperationException>(() => _bug.Fire(Trigger.Resolve));
         }
 
         [TestMethod]
-        public void Test_RejectFromAssigned_ShouldTransitionToRejected()
+        public void Test_17_Exception_When_Reopening_New_Bug()
         {
-            
-            var bug = new Bug();
-            bug.Assign("John");
-            
-            bug.Reject();
-            
-            Assert.AreEqual(BugState.Rejected, bug.CurrentState);
+            Assert.ThrowsException<InvalidOperationException>(() => _bug.Fire(Trigger.Reopen));
         }
 
         [TestMethod]
-        public void Test_RequestInfo_FromAssigned_ShouldTransitionToNeedMoreInfo()
+        public void Test_18_Exception_When_Closing_Directly_From_Fixing()
         {
-            
-            var bug = new Bug();
-            bug.Assign("John");
-            
-            bug.RequestInfo();
-            
-            Assert.AreEqual(BugState.NeedMoreInfo, bug.CurrentState);
+            _bug.Fire(Trigger.StartTriage);
+            _bug.Fire(Trigger.AssignToDev);
+            Assert.ThrowsException<InvalidOperationException>(() => _bug.Fire(Trigger.VerifyFixed));
         }
 
         [TestMethod]
-        public void Test_RejectedToOpenViaAssign()
+        public void Test_19_Exception_When_Double_Rejecting()
         {
-            
-            var bug = new Bug();
-            bug.Reject();
-            Assert.AreEqual(BugState.Rejected, bug.CurrentState);
-            
-            bug.Assign("John");
-            
-            Assert.AreEqual(BugState.Open, bug.CurrentState);
+            _bug.Fire(Trigger.StartTriage);
+            _bug.Fire(Trigger.Reject);
+            Assert.ThrowsException<InvalidOperationException>(() => _bug.Fire(Trigger.Reject));
         }
 
         [TestMethod]
-        public void Test_DuplicateToClosed()
+        public void Test_20_Exception_When_Returning_Closed_Bug_To_Triage_Without_Reopen()
         {
+            _bug.Fire(Trigger.StartTriage);
+            _bug.Fire(Trigger.AssignToDev);
+            _bug.Fire(Trigger.Resolve);
+            _bug.Fire(Trigger.VerifyFixed); 
             
-            var bug = new Bug();
-            bug.MarkDuplicate();
-            Assert.AreEqual(BugState.Duplicate, bug.CurrentState);
-            
-            bug.Close();
-            
-            Assert.AreEqual(BugState.Closed, bug.CurrentState);
+            Assert.ThrowsException<InvalidOperationException>(() => _bug.Fire(Trigger.ReturnToTriage));
         }
 
         [TestMethod]
-        public void Test_ReopenFromVerified_ShouldTransitionToReopened()
+        public void Test_21_Exception_When_Verifying_From_Deferred()
         {
-            
-            var bug = new Bug();
-            bug.Assign("John");
-            bug.StartWork();
-            bug.Fix();
-            bug.Verify();
-            
-            bug.Reopen();
-            
-            Assert.AreEqual(BugState.Reopened, bug.CurrentState);
-        }
-
-        [TestMethod]
-        public void Test_ReopenedToAssigned()
-        {
-            
-            var bug = new Bug();
-            bug.Assign("John");
-            bug.StartWork();
-            bug.Fix();
-            bug.Verify();
-            bug.Close();
-            bug.Reopen();
-            Assert.AreEqual(BugState.Reopened, bug.CurrentState);
-            
-            bug.Assign("John");
-            
-            Assert.AreEqual(BugState.Assigned, bug.CurrentState);
+            _bug.Fire(Trigger.StartTriage);
+            _bug.Fire(Trigger.Defer);
+            Assert.ThrowsException<InvalidOperationException>(() => _bug.Fire(Trigger.VerifyFixed));
         }
     }
 }
